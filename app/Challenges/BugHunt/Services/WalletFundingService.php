@@ -15,24 +15,12 @@ class WalletFundingService
 {
     public function fund(FundingData $input): FundingResult
     {
-        $wallet = Wallet::find($input->walletId);
-
-        if (! $wallet) {
-            throw new DomainException('WALLET_NOT_FOUND', 'Wallet was not found.', 404);
-        }
-
         if ($input->amount <= 0) {
             throw new DomainException('INVALID_AMOUNT', 'Funding amount must be positive.');
         }
 
         try {
             return DB::transaction(function () use ($input): FundingResult {
-                $wallet = Wallet::query()->whereKey($input->walletId)->lockForUpdate()->first();
-
-                if (! $wallet) {
-                    throw new DomainException('WALLET_NOT_FOUND', 'Wallet was not found.', 404);
-                }
-
                 $existing = WalletFunding::query()
                     ->where('reference', $input->reference)
                     ->with('wallet')
@@ -40,6 +28,12 @@ class WalletFundingService
 
                 if ($existing) {
                     return FundingResult::fromModels($existing, $existing->wallet->fresh());
+                }
+
+                $wallet = Wallet::query()->whereKey($input->walletId)->lockForUpdate()->first();
+
+                if (! $wallet) {
+                    throw new DomainException('WALLET_NOT_FOUND', 'Wallet was not found.', 404);
                 }
 
                 $wallet->increment('balance', $input->amount);
@@ -54,6 +48,10 @@ class WalletFundingService
                 return FundingResult::fromModels($funding, $wallet->fresh());
             });
         } catch (QueryException $exception) {
+            if (! $this->isDuplicateReferenceException($exception)) {
+                throw $exception;
+            }
+
             $existing = WalletFunding::query()
                 ->where('reference', $input->reference)
                 ->with('wallet')
@@ -65,5 +63,13 @@ class WalletFundingService
 
             return FundingResult::fromModels($existing, $existing->wallet->fresh());
         }
+    }
+
+    private function isDuplicateReferenceException(QueryException $exception): bool
+    {
+        $errorInfo = $exception->errorInfo;
+
+        return ($errorInfo[0] ?? null) === '23505'
+            || (($errorInfo[0] ?? null) === '23000' && in_array($errorInfo[1] ?? null, [19, 1062], true));
     }
 }
