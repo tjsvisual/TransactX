@@ -7,61 +7,28 @@ use App\Challenges\AppCompletion\DataTransferObjects\TransferResult;
 use App\Challenges\AppCompletion\Models\WalletTransfer;
 use App\Challenges\Shared\Exceptions\DomainException;
 use App\Challenges\Shared\Models\Wallet;
-use Illuminate\Support\Facades\DB;
 
 class WalletTransferService
 {
     public function transfer(TransferData $input): TransferResult
     {
-        if ($input->amount <= 0) {
-            throw new DomainException('INVALID_AMOUNT', 'Transfer amount must be positive.');
-        }
-
-        if ($input->fromWalletId === $input->toWalletId) {
-            throw new DomainException(
-                'SAME_WALLET_TRANSFER',
-                'Source and destination wallets must be different.',
-            );
-        }
-
-        return DB::transaction(function () use ($input): TransferResult {
-            $walletIds = [$input->fromWalletId, $input->toWalletId];
-            sort($walletIds, SORT_NUMERIC);
-            $wallets = [];
-
-            foreach ($walletIds as $walletId) {
-                $wallet = Wallet::query()->whereKey($walletId)->lockForUpdate()->first();
-
-                if (! $wallet) {
-                    throw new DomainException('WALLET_NOT_FOUND', 'Wallet was not found.', 404);
-                }
-
-                $wallets[$walletId] = $wallet;
-            }
-
-            $fromWallet = $wallets[$input->fromWalletId];
-            $toWallet = $wallets[$input->toWalletId];
-
-            if (! $fromWallet->isActive()) {
-                throw new DomainException('WALLET_NOT_ACTIVE', 'Source wallet is not active.');
-            }
-
-            if ($fromWallet->balance < $input->amount) {
-                throw new DomainException('INSUFFICIENT_BALANCE', 'Wallet balance is insufficient.');
-            }
-
-            $fromWallet->balance -= $input->amount;
-            $toWallet->balance += $input->amount;
-            $fromWallet->save();
-            $toWallet->save();
-
-            $transfer = WalletTransfer::create([
-                'from_wallet_id' => $fromWallet->id,
-                'to_wallet_id' => $toWallet->id,
-                'amount' => $input->amount,
-            ]);
-
-            return TransferResult::fromModels($transfer, $fromWallet, $toWallet);
-        });
+        // TODO: Implement this method.
+        //
+        // Expected behavior:
+        // - Reject an amount that is not a positive integer.
+        // - Reject a transfer where the source and destination wallet are the same.
+        // - Reject a transfer where the source or destination wallet does not exist.
+        // - Reject a transfer from a wallet whose status is not "active".
+        // - Reject a transfer where the source wallet has insufficient balance.
+        // - Debit the source wallet and credit the destination wallet atomically.
+        // - Lock both wallet rows for the duration of the balance check and update,
+        //   in a deterministic order, so two transfers moving money in opposite
+        //   directions between the same pair of wallets cannot deadlock or race.
+        // - Record a WalletTransfer and return a TransferResult built from it.
+        throw new DomainException(
+            'TRANSFER_NOT_IMPLEMENTED',
+            'Transfer logic has not been implemented yet.',
+            500,
+        );
     }
 }

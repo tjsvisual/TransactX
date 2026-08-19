@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('wallet_id')->constrained('wallets');
             $table->unsignedBigInteger('amount');
-            $table->string('reference')->unique();
+            $table->string('reference');
             $table->timestamps();
         });
     }
